@@ -30,8 +30,9 @@ import MyOrders from "./pages/MyOrders";
 import Profile from "./pages/Profile";
 
 const App = () => {
-  const isSellerPath = useLocation().pathname.includes("seller");
-  const { showUserLogin, isSeller } = useAppContext();
+  const location = useLocation();
+  const isSellerPath = location.pathname.includes("seller");
+  const { showUserLogin, isSeller } = useAppContext(); // This might be undefined
   
   return (
     <GoogleOAuthProvider clientId="233054564282-9bkk084dbqombdtinrbpdn9utmd1636k.apps.googleusercontent.com">
