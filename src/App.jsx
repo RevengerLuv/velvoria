@@ -26,7 +26,7 @@ import Invoices from "./pages/seller/Invoices";
 import FundUsage from "./pages/seller/FundUsage";
 import AdsManagement from "./pages/seller/AdsManagement";
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import MyOrders from "./pages/Myorders"; // Make sure this path is correct
+import MyOrders from "./pages/MyOrders"; // Make sure this path is correct
 import Profile from "./pages/Profile";
 
 const App = () => {
