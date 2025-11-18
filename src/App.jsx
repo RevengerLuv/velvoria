@@ -26,7 +26,6 @@ import Invoices from "./pages/seller/Invoices";
 import FundUsage from "./pages/seller/FundUsage";
 import AdsManagement from "./pages/seller/AdsManagement";
 import { GoogleOAuthProvider } from '@react-oauth/google';
-// import MyOrders from "./pages/MyOrders"; // Make sure this path is correct
 import Profile from "./pages/Profile";
 const App = () => {
   const location = useLocation();
@@ -77,7 +76,6 @@ const App = () => {
             <Route path="/product/:category/:id" element={<SingleProduct />} />
             <Route path="/cart" element={<Cart />} />
             <Route path="/add-address" element={<Address />} />
-            {/* <Route path="/my-orders" element={<MyOrders />} /> */}
             <Route path="/seller" element={isSeller ? <SellerLayout /> : <SellerLogin />}>
               <Route index element={<Dashboard />} />
               <Route path="accounts" element={<Accounts />} />
