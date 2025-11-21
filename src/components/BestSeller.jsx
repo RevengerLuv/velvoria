@@ -1,5 +1,5 @@
 import ProductCard from "./ProductCard";
-import { useAppContext } from "../context/appContext";
+import { useAppContext } from "../context/AppContext";
 
 const BestSeller = () => {
   const { products } = useAppContext();
