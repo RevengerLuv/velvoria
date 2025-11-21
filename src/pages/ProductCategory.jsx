@@ -1,7 +1,7 @@
 // ProductCategory.jsx - Updated for crochet categories
 import { categories } from "../assets/assets";
 import ProductCard from "../components/ProductCard";
-import { useAppContext } from "../context/appContext";
+import { useAppContext } from "../context/AppContext";
 import { useParams } from "react-router-dom";
 
 const ProductCategory = () => {
