@@ -1,50 +1,40 @@
-// AppContext.jsx - Enhanced for both backend and demo mode
+// AppContext.jsx - Real-time Backend Focused
 import { createContext, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import axios from "axios";
 
-// Set up axios with better error handling
-axios.defaults.withCredentials = true;
-axios.defaults.baseURL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
-axios.defaults.timeout = 10000; // 10 second timeout
-
-// Demo products data
-const demoProducts = [
-  {
-    _id: "1",
-    name: "Handmade Crochet Blanket",
-    description: "Beautiful handmade crochet blanket with soft yarn",
-    price: 49.99,
-    offerPrice: 39.99,
-    image: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400",
-    category: "blankets",
-    inStock: true,
-    materials: ["cotton", "wool"]
-  },
-  {
-    _id: "2",
-    name: "Crochet Baby Booties",
-    description: "Adorable crochet booties for babies",
-    price: 19.99,
-    offerPrice: 15.99,
-    image: "https://images.unsplash.com/photo-1589820296152-8d5e3d3fcbaf?w=400",
-    category: "accessories",
-    inStock: true,
-    materials: ["cotton"]
-  },
-  {
-    _id: "3",
-    name: "Vintage Crochet Table Runner",
-    description: "Elegant table runner for your dining table",
-    price: 34.99,
-    offerPrice: 29.99,
-    image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400",
-    category: "home-decor",
-    inStock: true,
-    materials: ["linen", "cotton"]
+// Smart backend URL configuration
+const getBackendConfig = () => {
+  const isDevelopment = import.meta.env.DEV;
+  const customBackendUrl = import.meta.env.VITE_BACKEND_URL;
+  
+  // Priority: Custom URL > Default production URL > Localhost for development
+  if (customBackendUrl) {
+    return customBackendUrl;
   }
-];
+  
+  if (isDevelopment) {
+    return "http://localhost:5000";
+  }
+  
+  // Return empty string in production if no backend URL is set
+  // This will cause backend checks to fail gracefully
+  return "";
+};
+
+const BACKEND_URL = getBackendConfig();
+
+// Configure axios
+if (BACKEND_URL) {
+  axios.defaults.baseURL = BACKEND_URL;
+}
+axios.defaults.timeout = 10000; // 10 second timeout
+axios.defaults.withCredentials = true;
+
+console.log("🚀 App Configuration:");
+console.log("🔧 Environment:", import.meta.env.MODE);
+console.log("🔧 Backend URL:", BACKEND_URL || "Not configured");
 
 // Create the context
 export const AppContext = createContext(null);
@@ -60,106 +50,128 @@ export const AppContextProvider = ({ children }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [backendConnected, setBackendConnected] = useState(false);
   const [backendChecking, setBackendChecking] = useState(true);
+  const [loading, setLoading] = useState(true);
 
-  // Check backend connection on app start
+  // Enhanced backend connection check
   const checkBackendConnection = async () => {
+    // If no backend URL is configured, mark as disconnected
+    if (!BACKEND_URL) {
+      console.log("❌ No backend URL configured");
+      setBackendConnected(false);
+      setBackendChecking(false);
+      return false;
+    }
+
     try {
       setBackendChecking(true);
-      const { data } = await axios.get("/api/health");
+      console.log("🔍 Checking backend connection at:", BACKEND_URL);
+      
+      const { data } = await axios.get("/api/health", {
+        timeout: 5000,
+        validateStatus: (status) => status < 500
+      });
+      
       setBackendConnected(true);
       console.log("✅ Backend connected successfully");
       return true;
     } catch (error) {
       setBackendConnected(false);
-      console.log("❌ Backend not available, using demo mode");
+      console.log("❌ Backend connection failed:", error.message);
+      
+      // Show appropriate error message based on error type
+      if (error.code === 'NETWORK_ERROR' || error.code === 'ECONNREFUSED') {
+        toast.error("Backend server is not available");
+      } else if (error.response) {
+        console.log("Backend responded with error:", error.response.status);
+      }
+      
       return false;
     } finally {
       setBackendChecking(false);
     }
   };
 
-  // Enhanced fetchProducts with better fallback
+  // Fetch products from backend
   const fetchProducts = async () => {
     if (!backendConnected) {
-      console.log("🔄 Using demo products (backend not connected)");
-      setProducts(demoProducts);
+      console.log("📦 Cannot fetch products - backend not connected");
+      setProducts([]);
+      setLoading(false);
       return;
     }
 
     try {
-      console.log("🔄 Attempting to fetch products from backend...");
+      setLoading(true);
+      console.log("🔄 Fetching products from backend...");
+      
       const { data } = await axios.get("/api/product/list");
-      if (data.success) {
+      
+      if (data.success && data.products) {
         setProducts(data.products);
-        console.log("✅ Products loaded from backend");
+        console.log(`✅ Loaded ${data.products.length} products from backend`);
+      } else {
+        console.log("❌ No products received from backend");
+        setProducts([]);
       }
     } catch (error) {
-      console.log("❌ Failed to fetch products, using demo data");
-      setProducts(demoProducts);
-      toast.success("Using demo mode - Backend not available");
+      console.error("❌ Failed to fetch products:", error.message);
+      setProducts([]);
+      toast.error("Failed to load products");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Enhanced fetchUser with demo mode support
+  // Fetch user data from backend
   const fetchUser = async () => {
     if (!backendConnected) {
-      console.log("🔄 Using demo user mode");
-      // Set a demo user for local testing
-      const demoUser = {
-        _id: "demo-user",
-        name: "Demo User",
-        email: "demo@example.com",
-        cart: {}
-      };
-      setUser(demoUser);
-      setCartItems(demoUser.cart || {});
+      console.log("👤 Cannot fetch user - backend not connected");
       return;
     }
 
     try {
       const { data } = await axios.get("/api/user/is-auth");
-      if (data.success) {
+      
+      if (data.success && data.user) {
         setUser(data.user);
         setCartItems(data.user.cart || {});
+        console.log("✅ User authenticated:", data.user.email);
       }
     } catch (error) {
-      console.log("Failed to fetch user, using demo mode:", error);
-      // Don't set demo user here to avoid overriding actual login
+      console.log("❌ User not authenticated or backend error:", error.message);
+      // Don't clear user here as they might be logged in but backend is temporarily down
     }
   };
 
-  // Enhanced fetchSeller with demo mode
+  // Fetch seller status from backend
   const fetchSeller = async () => {
     if (!backendConnected) {
-      console.log("🔄 Seller demo mode - not authenticated");
+      console.log("🏪 Cannot fetch seller status - backend not connected");
       setIsSeller(false);
       return;
     }
 
     try {
       const { data } = await axios.get("/api/seller/is-auth");
+      
       if (data.success) {
         setIsSeller(true);
-        console.log("✅ Seller is authenticated");
+        console.log("✅ Seller authenticated");
+      } else {
+        setIsSeller(false);
+        console.log("❌ Seller not authenticated");
       }
     } catch (error) {
+      console.log("❌ Failed to fetch seller status:", error.message);
       setIsSeller(false);
-      console.log("❌ Seller not authenticated");
     }
   };
 
-  // Enhanced seller login with demo mode
+  // Seller login with backend
   const sellerLogin = async (email, password) => {
     if (!backendConnected) {
-      // Demo seller login for testing
-      if (email === "demo@seller.com" && password === "demo123") {
-        setIsSeller(true);
-        toast.success("Demo seller login successful!");
-        return { success: true };
-      } else {
-        toast.error("Demo credentials: demo@seller.com / demo123");
-        return { success: false, message: "Use demo credentials" };
-      }
+      toast.error("Backend not available. Please check server connection.");
+      return { success: false, message: "Backend not available" };
     }
 
     try {
@@ -173,35 +185,27 @@ export const AppContextProvider = ({ children }) => {
         toast.success("Seller login successful!");
         return { success: true };
       } else {
-        toast.error(data.message);
+        toast.error(data.message || "Login failed");
         return { success: false, message: data.message };
       }
     } catch (error) {
       console.error("Seller login error:", error);
+      
       if (error.response?.data?.message) {
         toast.error(error.response.data.message);
         return { success: false, message: error.response.data.message };
       } else {
-        toast.error("Seller login failed - backend not available");
-        return { success: false, message: "Backend not available" };
+        toast.error("Login failed - server error");
+        return { success: false, message: "Server error" };
       }
     }
   };
 
-  // Enhanced Google Login
+  // Google Login with backend
   const googleLogin = async (credentialResponse) => {
     if (!backendConnected) {
-      // Demo Google login
-      const demoUser = {
-        _id: "google-demo-user",
-        name: "Google User",
-        email: "google@example.com",
-        cart: {}
-      };
-      setUser(demoUser);
-      setCartItems(demoUser.cart || {});
-      toast.success("Demo Google login successful!");
-      return true;
+      toast.error("Backend not available. Please check server connection.");
+      return false;
     }
 
     try {
@@ -215,7 +219,7 @@ export const AppContextProvider = ({ children }) => {
         toast.success("Google login successful!");
         return true;
       } else {
-        toast.error(data.message);
+        toast.error(data.message || "Google login failed");
         return false;
       }
     } catch (error) {
@@ -225,9 +229,92 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // Enhanced addToCart with demo mode
-  const addToCart = (itemId) => {
-    if (!user && backendConnected) {
+  // User registration with backend
+  const userRegister = async (userData) => {
+    if (!backendConnected) {
+      toast.error("Backend not available. Please check server connection.");
+      return { success: false, message: "Backend not available" };
+    }
+
+    try {
+      const { data } = await axios.post("/api/user/register", userData);
+      
+      if (data.success) {
+        setUser(data.user);
+        toast.success("Registration successful!");
+        return { success: true };
+      } else {
+        toast.error(data.message);
+        return { success: false, message: data.message };
+      }
+    } catch (error) {
+      console.error("Registration error:", error);
+      
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+        return { success: false, message: error.response.data.message };
+      } else {
+        toast.error("Registration failed");
+        return { success: false, message: "Registration failed" };
+      }
+    }
+  };
+
+  // User login with backend
+  const userLogin = async (email, password) => {
+    if (!backendConnected) {
+      toast.error("Backend not available. Please check server connection.");
+      return { success: false, message: "Backend not available" };
+    }
+
+    try {
+      const { data } = await axios.post("/api/user/login", {
+        email,
+        password,
+      });
+      
+      if (data.success) {
+        setUser(data.user);
+        setCartItems(data.user.cart || {});
+        setShowUserLogin(false);
+        toast.success("Login successful!");
+        return { success: true };
+      } else {
+        toast.error(data.message);
+        return { success: false, message: data.message };
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+        return { success: false, message: error.response.data.message };
+      } else {
+        toast.error("Login failed");
+        return { success: false, message: "Login failed" };
+      }
+    }
+  };
+
+  // User logout
+  const userLogout = async () => {
+    if (backendConnected) {
+      try {
+        await axios.post("/api/user/logout");
+      } catch (error) {
+        console.error("Logout error:", error);
+      }
+    }
+    
+    setUser(null);
+    setCartItems({});
+    setIsSeller(false);
+    toast.success("Logged out successfully");
+  };
+
+  // Add to cart with backend sync
+  const addToCart = async (itemId) => {
+    if (!user) {
       setShowUserLogin(true);
       toast.error("Please login to add items to cart");
       return;
@@ -239,39 +326,39 @@ export const AppContextProvider = ({ children }) => {
     } else {
       cartData[itemId] = 1;
     }
+    
     setCartItems(cartData);
     toast.success("Added to cart");
 
-    // Only update backend if connected
-    if (backendConnected && user) {
-      updateCartInBackend(cartData);
+    // Sync with backend if connected
+    if (backendConnected) {
+      try {
+        await axios.post("/api/cart/update", { cartItems: cartData });
+      } catch (error) {
+        console.error("Failed to update cart in backend:", error);
+        toast.error("Cart updated locally but failed to sync with server");
+      }
     }
   };
 
-  // Update cart in backend (only when connected)
-  const updateCartInBackend = async (cartData) => {
-    if (!backendConnected || !user) return;
-    
-    try {
-      await axios.post("/api/cart/update", { cartItems: cartData });
-    } catch (error) {
-      console.error("Failed to update cart in backend:", error);
-    }
-  };
-
-  // Update cart item quantity
-  const updateCartItem = (itemId, quantity) => {
+  // Update cart item quantity with backend sync
+  const updateCartItem = async (itemId, quantity) => {
     let cartData = { ...cartItems };
     cartData[itemId] = quantity;
     setCartItems(cartData);
     
+    // Sync with backend if connected
     if (backendConnected && user) {
-      updateCartInBackend(cartData);
+      try {
+        await axios.post("/api/cart/update", { cartItems: cartData });
+      } catch (error) {
+        console.error("Failed to update cart in backend:", error);
+      }
     }
   };
 
-  // Remove from cart
-  const removeFromCart = (itemId) => {
+  // Remove from cart with backend sync
+  const removeFromCart = async (itemId) => {
     let cartData = { ...cartItems };
     if (cartData[itemId]) {
       cartData[itemId] -= 1;
@@ -281,8 +368,13 @@ export const AppContextProvider = ({ children }) => {
       setCartItems(cartData);
       toast.success("Removed from cart");
       
+      // Sync with backend if connected
       if (backendConnected && user) {
-        updateCartInBackend(cartData);
+        try {
+          await axios.post("/api/cart/update", { cartItems: cartData });
+        } catch (error) {
+          console.error("Failed to update cart in backend:", error);
+        }
       }
     }
   };
@@ -302,68 +394,46 @@ export const AppContextProvider = ({ children }) => {
     for (const itemId in cartItems) {
       const itemInfo = products.find((product) => product._id === itemId);
       if (itemInfo && cartItems[itemId] > 0) {
-        totalAmount += cartItems[itemId] * itemInfo.offerPrice;
+        totalAmount += cartItems[itemId] * (itemInfo.offerPrice || itemInfo.price);
       }
     }
     return Math.floor(totalAmount * 100) / 100;
   };
 
-  // User login function for demo mode
-  const userLogin = async (email, password) => {
-    if (!backendConnected) {
-      // Demo user login
-      if (email === "demo@user.com" && password === "demo123") {
-        const demoUser = {
-          _id: "demo-user",
-          name: "Demo User",
-          email: "demo@user.com",
-          cart: {}
-        };
-        setUser(demoUser);
-        setCartItems(demoUser.cart || {});
-        setShowUserLogin(false);
-        toast.success("Demo login successful!");
-        return { success: true };
-      } else {
-        toast.error("Demo credentials: demo@user.com / demo123");
-        return { success: false, message: "Use demo credentials" };
-      }
+  // Refresh backend connection
+  const refreshBackendConnection = async () => {
+    const connected = await checkBackendConnection();
+    if (connected) {
+      await fetchProducts();
+      await fetchUser();
+      await fetchSeller();
     }
-
-    // Actual backend login would go here
-    // You can implement this when you have a backend
-    toast.error("Backend login not implemented");
-    return { success: false, message: "Backend login not available" };
+    return connected;
   };
 
-  // Initialize - check backend first, then load data
+  // Initialize app
   useEffect(() => {
     const initializeApp = async () => {
       const connected = await checkBackendConnection();
       if (connected) {
-        await fetchSeller();
-        await fetchProducts();
-        await fetchUser();
+        // Load all data from backend
+        await Promise.all([
+          fetchProducts(),
+          fetchUser(),
+          fetchSeller()
+        ]);
       } else {
-        // Load demo data immediately if no backend
-        fetchProducts();
-        fetchUser();
-        fetchSeller();
+        setLoading(false);
+        toast.error("Backend server not available. Please check your connection.");
       }
     };
 
     initializeApp();
   }, []);
 
-  // Update cart in backend when it changes (only when backend is connected)
-  useEffect(() => {
-    if (backendConnected && user) {
-      updateCartInBackend(cartItems);
-    }
-  }, [cartItems, user, backendConnected]);
-
   // Context value
   const value = {
+    // State
     navigate,
     user,
     setUser,
@@ -373,23 +443,37 @@ export const AppContextProvider = ({ children }) => {
     setShowUserLogin,
     products,
     cartItems,
+    searchQuery,
+    setSearchQuery,
+    backendConnected,
+    backendChecking,
+    loading,
+    
+    // Auth functions
+    googleLogin,
+    sellerLogin,
+    userLogin,
+    userRegister,
+    userLogout,
+    fetchSeller,
+    
+    // Cart functions
     addToCart,
     updateCartItem,
     removeFromCart,
-    searchQuery,
-    setSearchQuery,
-    googleLogin,
     cartCount,
     totalCartAmount,
-    axios,
+    
+    // Data functions
     fetchProducts,
     setCartItems,
-    backendConnected,
-    backendChecking,
-    sellerLogin,
-    fetchSeller,
-    userLogin, // Add this for user login
-    checkBackendConnection, // Add this to allow re-checking connection
+    
+    // Backend functions
+    refreshBackendConnection,
+    checkBackendConnection,
+    
+    // Axios instance for direct API calls
+    axios,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
