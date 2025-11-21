@@ -1,6 +1,6 @@
 // SingleProduct.jsx - Updated for crochet products
 import { useEffect, useState } from "react";
-import { useAppContext } from "../context/appContext";
+import { useAppContext } from "../context/AppContext";
 import { Link, useParams } from "react-router-dom";
 import { assets } from "../assets/assets";
 import ProductCard from "../components/ProductCard";
