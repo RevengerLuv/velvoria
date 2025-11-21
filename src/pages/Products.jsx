@@ -1,7 +1,7 @@
 // Products.jsx - Updated for crochet products
 import { useState, useEffect } from "react";
 import ProductCard from "../components/ProductCard";
-import { useAppContext } from "../context/appContext";
+import { useAppContext } from "../context/AppContext"; // Changed from "appContext" to "AppContext"
 
 const Products = () => {
   const { products, searchQuery } = useAppContext();
